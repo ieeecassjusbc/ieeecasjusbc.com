@@ -10,6 +10,7 @@ for (const gallery of document.querySelectorAll('[data-spotlight]')) {
   dimmer.setAttribute('aria-hidden', 'true');
   gallery.append(dimmer);
 
+  const motion = window.matchMedia('(prefers-reduced-motion: reduce)');
   let current = 0;
   let focused = false;
   let inView = !('IntersectionObserver' in window);
@@ -37,22 +38,29 @@ for (const gallery of document.querySelectorAll('[data-spotlight]')) {
 
   async function advance() {
     transitioning = true;
-    const next = (current + 1) % photos.length;
-    const image = photos[next].querySelector('img');
-    image.loading = 'eager';
-    await image.decode().catch(() => {});
+    let fade;
+    try {
+      const next = (current + 1) % photos.length;
+      const image = photos[next].querySelector('img');
+      image.loading = 'eager';
+      await image.decode().catch(() => {});
 
-    if (canAdvance() && image.naturalWidth) {
-      const fade = dimmer.animate([{ opacity: 0 }, { opacity: 1 }], fadeTiming);
-      await fade.finished;
-      if (canAdvance()) showPhoto(next);
-      fade.reverse();
-      await fade.finished;
-      fade.cancel();
+      if (canAdvance() && image.naturalWidth) {
+        if (motion.matches) {
+          showPhoto(next);
+          return;
+        }
+        fade = dimmer.animate([{ opacity: 0 }, { opacity: 1 }], fadeTiming);
+        await fade.finished;
+        if (canAdvance()) showPhoto(next);
+        fade.reverse();
+        await fade.finished;
+      }
+    } finally {
+      fade?.cancel();
+      transitioning = false;
+      schedule();
     }
-
-    transitioning = false;
-    schedule();
   }
 
   gallery.addEventListener('focusin', () => {
